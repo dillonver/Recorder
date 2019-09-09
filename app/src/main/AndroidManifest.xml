@@ -21,7 +21,7 @@
             </intent-filter>
         </activity>
 
-        <service android:name=".CallListenerService"></service>
+        <service android:name=".RecordService"></service>
 
 
     </application>

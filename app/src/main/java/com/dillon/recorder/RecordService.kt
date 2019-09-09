@@ -18,12 +18,13 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 
-class CallListenerService : Service() {
+class RecordService : Service() {
+
     //An additional thread for running tasks that shouldn't block the UI.
     private var mBackgroundThread: HandlerThread? = null
-
     //A [Handler] for running tasks in the background.
     private var mBackgroundHandler: Handler? = null
+
     private var telephonyManager: TelephonyManager? = null
     private var mediaRecorder: MediaRecorder? = null
     private var listener: MyPhoneStateListener? = null
@@ -90,7 +91,7 @@ class CallListenerService : Service() {
                         mediaRecorder!!.release()
                         mediaRecorder = null
                         //提示：拨号出去的录音，是从拨号就开始录音的；而接听，是从接听开始录音
-                        Log.i("CallListenerService", "mediaRecorder.stop")
+                        Log.i("RecordService", "mediaRecorder.stop")
                         //TODO  录制完毕，上传到服务器
 
                     }
@@ -116,9 +117,9 @@ class CallListenerService : Service() {
                             dir.mkdir()
                         }
                         if (isOutGoingCall) {
-                            Log.i("CallListenerService", "拨出电话：$incomingNumber")
+                            Log.i("RecordService", "拨出电话：$incomingNumber")
                         } else {
-                            Log.i("CallListenerService", "接听电话：$incomingNumber")
+                            Log.i("RecordService", "接听电话：$incomingNumber")
                         }
                         file = File(dir.absolutePath, "$incomingNumber-$time1.m4a")
                         isOutGoingCall = true
@@ -127,7 +128,7 @@ class CallListenerService : Service() {
                         mediaRecorder!!.setAudioEncoder(MediaRecorder.AudioEncoder.DEFAULT)
                         mediaRecorder!!.prepare()
                         mediaRecorder!!.start()
-                        Log.i("CallListenerService", "mediaRecorder.start")
+                        Log.i("RecordService", "mediaRecorder.start")
                     }
 
                 }
@@ -136,6 +137,14 @@ class CallListenerService : Service() {
             }
 
         }
+    }
+
+
+
+    override fun onDestroy() {
+        super.onDestroy()
+        stopBackgroundThread()
+        listener = null
     }
 
     //Starts a background thread and its [Handler].
@@ -157,12 +166,5 @@ class CallListenerService : Service() {
         }
 
     }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        stopBackgroundThread()
-        listener = null
-    }
-
 
 }
