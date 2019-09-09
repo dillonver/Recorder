@@ -1,22 +1,29 @@
 package com.dillon.recorder
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.media.MediaRecorder
-import android.os.Build
-import android.os.Environment
-import android.os.IBinder
+import android.os.*
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
 import android.util.Log
+import androidx.annotation.RequiresApi
 
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 
 class CallListenerService : Service() {
+    //An additional thread for running tasks that shouldn't block the UI.
+    private var mBackgroundThread: HandlerThread? = null
 
+    //A [Handler] for running tasks in the background.
+    private var mBackgroundHandler: Handler? = null
     private var telephonyManager: TelephonyManager? = null
     private var mediaRecorder: MediaRecorder? = null
     private var listener: MyPhoneStateListener? = null
@@ -30,12 +37,45 @@ class CallListenerService : Service() {
         telephonyManager = this.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
         listener = MyPhoneStateListener()
         telephonyManager!!.listen(listener, PhoneStateListener.LISTEN_CALL_STATE)
+        startBackgroundThread()
         super.onCreate()
     }
 
+    override fun onStart(intent: Intent?, startId: Int) {
+        super.onStart(intent, startId)
+        startBackgroundThread()
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.i(this.toString(), "onStartCommand")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            createNotificationChannel()
+        }
         return super.onStartCommand(intent, flags, startId)
+    }
+
+
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    private fun createNotificationChannel() {
+        val mNotificationManager =
+                getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channelId = "call_01"
+        val channelName = "record"
+        val channelDescription = "this a record"
+        val channelImportance =
+                NotificationManager.IMPORTANCE_NONE
+        val mChannel = NotificationChannel(channelId, channelName, channelImportance)
+        mChannel.description = channelDescription
+        mChannel.enableLights(false)
+        mChannel.lightColor = Color.RED
+        mChannel.enableVibration(false)
+        mChannel.vibrationPattern = longArrayOf(100, 200, 300, 400, 500, 400, 300, 200, 400)
+        mNotificationManager.createNotificationChannel(mChannel)
+        val notifyID = 1
+        val notification = Notification.Builder(this)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setChannelId(channelId)
+                .build()
+        startForeground(notifyID, notification)
     }
 
     // 监听电话呼叫状态变化
@@ -98,15 +138,31 @@ class CallListenerService : Service() {
         }
     }
 
+    //Starts a background thread and its [Handler].
+    private fun startBackgroundThread() {
+        mBackgroundThread = HandlerThread("CallBackground")
+        mBackgroundThread!!.start()
+        mBackgroundHandler = Handler(mBackgroundThread!!.looper)
+    }
+
+    // Stops the background thread and its [Handler].
+    private fun stopBackgroundThread() {
+        mBackgroundThread!!.quitSafely()
+        try {
+            mBackgroundThread!!.join()
+            mBackgroundThread = null
+            mBackgroundHandler = null
+        } catch (e: InterruptedException) {
+            Log.i(this.toString(), e.toString())
+        }
+
+    }
+
     override fun onDestroy() {
         super.onDestroy()
-        // 线程守护
-        val i = Intent(this, CallProtectService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(i)
-        } else {
-            startService(i)
-        }
+        stopBackgroundThread()
         listener = null
     }
+
+
 }

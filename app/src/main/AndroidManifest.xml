@@ -21,7 +21,6 @@
             </intent-filter>
         </activity>
 
-        <service android:name=".CallProtectService"></service>
         <service android:name=".CallListenerService"></service>
 
 
